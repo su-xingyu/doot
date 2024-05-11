@@ -3,12 +3,21 @@
  */
 package org.example;
 
+import soot.PackManager;
+import soot.Scene;
+import soot.SootClass;
+
 public class App {
-    public String getGreeting() {
-        return "Hello World!";
-    }
 
     public static void main(String[] args) {
-        System.out.println(new App().getGreeting());
+        String example = "naive";
+        String mainClass = "Naive";
+        Driver driver = new Driver(example, mainClass);
+        driver.setupSoot();
+
+        PackManager.v().writeOutput();
+//        for (SootClass sc : Scene.v().getClasses()) {
+//            System.out.println(sc.getName());
+//        }
     }
 }

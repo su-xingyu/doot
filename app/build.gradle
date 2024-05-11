@@ -19,7 +19,8 @@ repositories {
 dependencies {
     // This dependency is used by the application.
     implementation libs.guava
-    implementation 'org.soot-oss:soot:4.3.0'
+    implementation 'org.soot-oss:soot:4.5.0'
+    implementation 'log4j:log4j:1.2.17'
 }
 
 testing {
