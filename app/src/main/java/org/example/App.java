@@ -4,20 +4,37 @@
 package org.example;
 
 import soot.PackManager;
-import soot.Scene;
-import soot.SootClass;
+import soot.options.Options;
 
 public class App {
 
-    public static void main(String[] args) {
-        String example = "naive";
-        String mainClass = "Naive";
-        Driver driver = new Driver(example, mainClass);
+    public static void main(String[] args) throws DootException {
+        Parameters parameters = new Parameters();
+        parameters.initFromArgs(args);
+
+        Driver driver = new Driver(parameters._example, parameters._mainClass);
         driver.setupSoot();
 
+        driver.invokeDoop();
+
+        String cls = "Naive";
+        String method = "void main(java.lang.String[])";
+        String assignee = "l3#_10";
+        String assignor = "Hello, World!";
+        Driver.ValueType assignorType = Driver.ValueType.STRING;
+        driver.optimizeInverseVariables(cls, method, assignee, assignor, assignorType);
+
+        switch (parameters._outputFormat) {
+            case "shimple":
+                Options.v().set_output_format(Options.output_format_shimple);
+                break;
+            case "class":
+                driver.transformAllToJimpleBodies();
+                Options.v().set_output_format(Options.output_format_class);
+                break;
+            default:
+                throw new DootException("Unsupported output format: " + parameters._outputFormat);
+        }
         PackManager.v().writeOutput();
-//        for (SootClass sc : Scene.v().getClasses()) {
-//            System.out.println(sc.getName());
-//        }
     }
 }

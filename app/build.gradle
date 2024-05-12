@@ -21,6 +21,7 @@ dependencies {
     implementation libs.guava
     implementation 'org.soot-oss:soot:4.5.0'
     implementation 'log4j:log4j:1.2.17'
+    implementation 'com.sun.xml.ws:jaxws-rt:2.2.10'
 }
 
 testing {

@@ -2,6 +2,7 @@ import java.io.FileWriter;
 import java.io.FileReader;
 import java.io.BufferedReader;
 import java.io.IOException;
+
 public class Naive {
     public static void main(String[] args) throws IOException {
         String text = "Hello, World!";
