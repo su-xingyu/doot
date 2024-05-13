@@ -81,10 +81,12 @@ MustEqual(?serializerInput, ?deserializerOutput) :-
 
 // In Doop, string constants are represented as $stringConstant variables in its fact sets, we need to convert them
 // back to their string values
-MustEqualTyped(?stringConstant, ?deserializerOutput, "STRING") :-
+MustEqualTyped(?stringConstantWithContext, ?deserializerOutput, "STRING") :-
     MustEqual(?serializerInput, ?deserializerOutput),
     AssignHeapAllocation(?stringConstant, ?serializerInput, _),
-    isStringConstant(?stringConstant).
+    isStringConstant(?stringConstant),
+    Var_DeclaringMethod(?serializerInput, ?method),
+    ?stringConstantWithContext = cat(?method, cat("/", ?stringConstant)).
 
 // When ?serializerInput is a normal variable, we need to exclude the possibility of it being string constants
 MustEqualTyped(?serializerInput, ?deserializerOutput, "VAR") :-

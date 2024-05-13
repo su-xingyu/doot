@@ -31,28 +31,26 @@ public class Parser {
             throw new DootException("Bad input for parsing MustEqualTyped");
         }
 
-        Variable assignee = parseVariable(elements[1]);
-        mustEqualTyped.assigneeClass = assignee.className;
-        mustEqualTyped.assigneeSubMethodSig = assignee.subMethodSig;
-        mustEqualTyped.assignee = assignee.varName;
+        Variable assignor = parseVariable(elements[0]);
+        mustEqualTyped.assignorClass = assignor.className;
+        mustEqualTyped.assignorSubMethodSig = assignor.subMethodSig;
+        mustEqualTyped.assignor = assignor.varName;
 
         switch (elements[2]) {
             case "STRING":
-                mustEqualTyped.assignorClass = assignee.className;
-                mustEqualTyped.assignorSubMethodSig = assignee.subMethodSig;
-                mustEqualTyped.assignor = elements[0];
                 mustEqualTyped.assignorType = ValueType.STRING;
                 break;
             case "VAR":
-                Variable assignor = parseVariable(elements[0]);
-                mustEqualTyped.assignorClass = assignor.className;
-                mustEqualTyped.assignorSubMethodSig = assignor.subMethodSig;
-                mustEqualTyped.assignor = assignor.varName;
                 mustEqualTyped.assignorType = ValueType.VAR;
                 break;
             default:
                 throw new DootException("Undefined assignorType");
         }
+
+        Variable assignee = parseVariable(elements[1]);
+        mustEqualTyped.assigneeClass = assignee.className;
+        mustEqualTyped.assigneeSubMethodSig = assignee.subMethodSig;
+        mustEqualTyped.assignee = assignee.varName;
 
         return mustEqualTyped;
     }
