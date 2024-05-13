@@ -6,6 +6,9 @@ public class Parameters {
     public String _example = "";
     public String _mainClass = "";
     public String _outputFormat = "class";
+    public boolean _skipDoop = false;   // Only for test purpose
+    public String _doopDir = "";    // Only for test purpose
+    public boolean _skipOptimize = false;
 
     public void initFromArgs(String[] args) throws DootException {
         processArgs(args);
@@ -15,6 +18,10 @@ public class Parameters {
     private void finishArgsProcessing() throws DootException {
         if (_example.isEmpty() || _mainClass.isEmpty()) {
             throw new DootException("Please specify the name of example");
+        }
+
+        if (!_skipDoop && _doopDir.isEmpty()) {
+            throw new DootException("Please specify Doop directory");
         }
     }
 
@@ -41,6 +48,15 @@ public class Parameters {
                 i = shift(args, i);
                 _outputFormat = args[i];
                 break;
+            case "--skip-doop":
+                _skipDoop = true;
+                break;
+            case "--doop-dir":
+                i = shift(args, i);
+                _doopDir = args[i];
+                break;
+            case "--skip-optimize":
+                _skipOptimize = true;
             default:
                 return -1;
         }

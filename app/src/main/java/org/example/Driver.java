@@ -1,5 +1,6 @@
 package org.example;
 
+import org.apache.log4j.Logger;
 import org.example.doop.DoopConventions;
 import org.example.doop.DoopRenamer;
 import soot.*;
@@ -8,35 +9,47 @@ import soot.options.Options;
 import soot.shimple.Shimple;
 import soot.shimple.ShimpleBody;
 
-import java.io.File;
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.Objects;
 
 public class Driver {
 
-    public enum ValueType {
-        VAR,
-        STRING
-    }
+    private static final Logger logger = Logger.getLogger(Driver.class);
 
-    private static final String EXAMPLE_DIR = System.getProperty("user.dir") + File.separator + ".." + File.separator + "example";
-    private static final String TMP_DIR = System.getProperty("user.dir") + File.separator + ".." + File.separator + "tmp";
-    private static final String OUTPUT_DIR = System.getProperty("user.dir") + File.separator + ".." + File.separator + "output";
+    private final Parser parser;
 
     private final String example;
     private final String mainClass;
 
-    public Driver(String example, String mainClass) {
+    private final String doopDir;
+    private final Path baseDir;
+    private final Path exampleDir;
+    private final Path logDir;
+    private final Path outputDir;
+
+    public Driver(String example, String mainClass, String doopDir) {
+        this.parser = new Parser();
+
         this.example = example;
         this.mainClass = mainClass;
+        this.doopDir = doopDir;
+
+        this.baseDir = Paths.get(System.getProperty("user.dir")).getParent();
+        this.exampleDir = Paths.get(baseDir + File.separator + "example");
+        this.logDir = Paths.get(baseDir + File.separator + "log");
+        this.outputDir = Paths.get(baseDir + File.separator + "output");
     }
 
     public void setupSoot() {
         G.reset();
 
         Options.v().set_src_prec(Options.src_prec_only_class);
-        Options.v().set_output_dir(OUTPUT_DIR);
-        Options.v().set_process_dir(Collections.singletonList(EXAMPLE_DIR + File.separator + this.example));
+        Options.v().set_output_dir(outputDir.toString());
+        Options.v().set_process_dir(Collections.singletonList(exampleDir + File.separator + this.example));
         Options.v().set_main_class(this.mainClass);
 
         applyDoopSettings();
@@ -97,17 +110,39 @@ public class Driver {
         }
     }
 
+    public void optimize() throws DootException, IOException {
+        BufferedReader bufferedReader = new BufferedReader(
+                new FileReader(doopDir + File.separator + "last-analysis/MustEqualTyped.csv"));
 
-    public void optimizeInverseVariables(String cls, String method, String assignee, String assignor, ValueType assignorType) throws DootException {
-        SootClass sootClass = Scene.v().getSootClass(cls);
-        SootMethod sootMethod = sootClass.getMethod(method);
+        String line = bufferedReader.readLine();
+        while (line != null) {
+            optimizeOnce(line);
+            line = bufferedReader.readLine();
+        }
+    }
+
+    private void optimizeOnce(String line) throws DootException {
+        Parser.MustEqualTyped mustEqualTyped = parser.parseMustEqualTyped(line);
+        if (Objects.equals(mustEqualTyped.assigneeClass, mustEqualTyped.assignorClass) &&
+                Objects.equals(mustEqualTyped.assigneeSubMethodSig, mustEqualTyped.assignorSubMethodSig)) {
+            // No inlining
+            optimizeInverseVariables(mustEqualTyped.assigneeClass, mustEqualTyped.assigneeSubMethodSig,
+                    mustEqualTyped.assignee, mustEqualTyped.assignor, mustEqualTyped.assignorType);
+        }
+    }
+
+    private void optimizeInverseVariables(String className, String subMethodSig, String assignee, String assignor,
+                                          Parser.ValueType assignorType) throws DootException {
+        SootClass sootClass = Scene.v().getSootClass(className);
+        SootMethod sootMethod = sootClass.getMethod(subMethodSig);
         Body body = sootMethod.getActiveBody();
         if (!(body instanceof ShimpleBody)) {
-            throw new DootException("Method " + method + " should be converted to Shimple body before optimization");
+            throw new DootException("Method " + subMethodSig +
+                    " should be converted to Shimple body before optimization");
         }
 
         Value assigorValue = null;
-        if (assignorType == ValueType.VAR) {
+        if (assignorType == Parser.ValueType.VAR) {
             assigorValue = getVariableByName(body, assignor);
         }
 
@@ -193,8 +228,27 @@ public class Driver {
         }
     }
 
-    public void invokeDoop() {
+    public void invokeDoop() throws IOException, InterruptedException {
+        logger.debug("Doop directory: " + doopDir);
 
+        String command = "./doop "
+                + "-a context-insensitive "
+                + "-i " + exampleDir + File.separator + example + File.separator + mainClass + ".jar "
+                + "--extra-logic " + exampleDir + File.separator + example + File.separator + "extra.dl "
+                + "--stats none";
+        logger.debug("Invoking Doop: " + command);
+
+        if (!Files.exists(logDir)) {
+            Files.createDirectories(logDir);
+        }
+        File doopLog = new File(logDir + File.separator + System.currentTimeMillis() + ".log");
+        logger.debug("Redirecting Doop console output to " + doopLog);
+
+        ProcessBuilder builder = new ProcessBuilder(command.split(" "));
+        builder.directory(new File(doopDir));
+        builder.redirectOutput(doopLog);
+        Process process = builder.start();
+        process.waitFor();
     }
 }
 

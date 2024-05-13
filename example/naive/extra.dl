@@ -1,0 +1,99 @@
+// --- Serializer definition ---
+.decl isSerializerMethod(?method:Method)
+isSerializerMethod("<Naive: java.lang.String toHexString(java.lang.String)>").
+
+.decl SerializerInputParam(?method:Method, ?index:number)
+SerializerInputParam("<Naive: java.lang.String toHexString(java.lang.String)>", 0).
+
+// serializerOutputValue is treated as a special heap value to fit in the framework
+.decl Serializer(?serializerOutputValue:Value, ?input:Value, ?output:Var, ?method:Method)
+.output Serializer
+
+// --- Deserializer definition ---
+.decl isDeserializerMethod(?method:Method)
+isDeserializerMethod("<Naive: java.lang.String fromHexString(java.lang.String)>").
+
+.decl DeserializerInputParam(?method:Method, ?index:number)
+DeserializerInputParam("<Naive: java.lang.String fromHexString(java.lang.String)>", 0).
+
+// deserializerOutputValue is treated as a special heap value to fit in the framework
+.decl Deserializer(?input:Var, ?output:Var, ?method:Method)
+.output Deserializer
+
+// --- Optimization definition ---
+.decl isInverse(?serializerMethod:Method, ?deserializerMethod:Method)
+isInverse("<Naive: java.lang.String toHexString(java.lang.String)>", "<Naive: java.lang.String fromHexString(java.lang.String)>").
+
+// Only within the context of serialization
+.decl MayAliasSerialized(?a:Var, ?b:Var)
+
+.decl MayEqual(?serializerInput:Value, ?deserializerOutput:Var)
+.output MayEqual
+
+.decl MustAliasSerialized(?a:Var, ?b:Var)
+
+.decl MustEqual(?serializerInput:Value, ?deserializerOutput:Var)
+.output MustEqual
+
+.decl MustEqualTyped(?serializerInput: Value, ?deserializerOutput: Var, ?type: symbol)
+.output MustEqualTyped
+
+// --- Rules ---
+// Reuse mainAnalysis.VarPointsTo for context-sensitive analysis
+// Must register the type of ?serializerOutputValue to make things work
+mainAnalysis.Value_Type(?serializerOutputValue, ?type),
+Serializer(?serializerOutputValue, ?input, ?output, ?inmethod),
+mainAnalysis.configuration.RecordContextRequest(?ctx, ?serializerOutputValue, ?output) :-
+    isSerializerMethod(?inmethod),
+    mainAnalysis.CallGraphEdge(?ctx, ?invocation, _, ?inmethod),
+    AssignReturnValue(?invocation, ?output),
+    SerializerInputParam(?inmethod, ?index),
+    ActualParam(?index, ?invocation, ?input),
+    Method_ReturnType(?inmethod, ?type),
+    ?serializerOutputValue = cat("<", cat(?inmethod, cat(": ", cat(?input, ">")))).
+
+Deserializer(?input, ?output, ?inmethod) :-
+    isDeserializerMethod(?inmethod),
+    mainAnalysis.CallGraphEdge(_, ?invocation, _, ?inmethod),
+    AssignReturnValue(?invocation, ?output),
+    DeserializerInputParam(?inmethod, ?index),
+    ActualParam(?index, ?invocation, ?input).
+
+MayAliasSerialized(?a, ?b) :-
+    Serializer(?serializerOutputValue, _, _, _),
+    mainAnalysis.VarPointsTo(_, ?serializerOutputValue, _, ?a),
+    mainAnalysis.VarPointsTo(_, ?serializerOutputValue, _, ?b).
+
+MayEqual(?serializerInput, ?deserializerOutput) :-
+    isInverse(?serializerMethod, ?deserializerMethod),
+    Serializer(_, ?serializerInput, ?serializerOutput, ?serializerMethod),
+    Deserializer(?deserializerInput, ?deserializerOutput, ?deserializerMethod),
+    MustAliasSerialized(?serializerOutput, ?deserializerInput).
+
+MustAliasSerialized(?a, ?a) :-
+    Serializer(_, _, ?a, _).
+
+MustEqual(?serializerInput, ?deserializerOutput) :-
+    isInverse(?serializerMethod, ?deserializerMethod),
+    Serializer(_, ?serializerInput, ?serializerOutput, ?serializerMethod),
+    Deserializer(?deserializerInput, ?deserializerOutput, ?deserializerMethod),
+    MustAliasSerialized(?serializerOutput, ?deserializerInput).
+
+// In Doop, string constants are represented as $stringConstant variables in its fact sets, we need to convert them
+// back to their string values
+MustEqualTyped(?stringConstant, ?deserializerOutput, "STRING") :-
+    MustEqual(?serializerInput, ?deserializerOutput),
+    AssignHeapAllocation(?stringConstant, ?serializerInput, _),
+    isStringConstant(?stringConstant).
+
+// When ?serializerInput is a normal variable, we need to exclude the possibility of it being string constants
+MustEqualTyped(?serializerInput, ?deserializerOutput, "VAR") :-
+    MustEqual(?serializerInput, ?deserializerOutput),
+    isVar(?serializerInput),
+    AssignHeapAllocation(?heap, ?serializerInput, _),
+    !isStringConstant(?heap).
+
+MustEqualTyped(?serializerInput, ?deserializerOutput, "VAR") :-
+    MustEqual(?serializerInput, ?deserializerOutput),
+    isVar(?serializerInput),
+    !AssignHeapAllocation(_, ?serializerInput, _).

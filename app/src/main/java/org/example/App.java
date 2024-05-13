@@ -6,23 +6,24 @@ package org.example;
 import soot.PackManager;
 import soot.options.Options;
 
+import java.io.IOException;
+
 public class App {
 
-    public static void main(String[] args) throws DootException {
+    public static void main(String[] args) throws DootException, IOException, InterruptedException {
         Parameters parameters = new Parameters();
         parameters.initFromArgs(args);
 
-        Driver driver = new Driver(parameters._example, parameters._mainClass);
+        Driver driver = new Driver(parameters._example, parameters._mainClass, parameters._doopDir);
         driver.setupSoot();
 
-        driver.invokeDoop();
+        if (!parameters._skipDoop) {
+            driver.invokeDoop();
+        }
 
-        String cls = "Naive";
-        String method = "void main(java.lang.String[])";
-        String assignee = "l3#_10";
-        String assignor = "Hello, World!";
-        Driver.ValueType assignorType = Driver.ValueType.STRING;
-        driver.optimizeInverseVariables(cls, method, assignee, assignor, assignorType);
+        if (!parameters._skipOptimize) {
+            driver.optimize();
+        }
 
         switch (parameters._outputFormat) {
             case "shimple":

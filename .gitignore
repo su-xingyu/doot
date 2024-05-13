@@ -9,4 +9,4 @@ build
 
 # Ignore Doot output directories
 output
-tmp
+log
