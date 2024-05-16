@@ -1,5 +1,6 @@
 package org.example;
 
+import org.apache.log4j.Logger;
 import soot.*;
 import soot.jimple.AssignStmt;
 import soot.jimple.DefinitionStmt;
@@ -14,6 +15,7 @@ import java.nio.file.Path;
 import java.util.Objects;
 
 public class Optimizer {
+    private static final Logger logger = Logger.getLogger(Optimizer.class);
     private final Parser parser;
 
     private final Path doopDir;
@@ -26,7 +28,7 @@ public class Optimizer {
 
     public void optimize() throws DootException, IOException {
         BufferedReader bufferedReader = new BufferedReader(
-                new FileReader(doopDir + File.separator + "last-analysis/MustEqualTyped.csv"));
+                new FileReader(doopDir + File.separator + "last-analysis/ValuePairToOptimizeTyped.csv"));
 
         String line = bufferedReader.readLine();
         while (line != null) {
@@ -36,6 +38,7 @@ public class Optimizer {
     }
 
     private void optimizeOnce(String line) throws DootException {
+        logger.debug("Optimizing value pair: " + line);
         Parser.MustEqualTyped mustEqualTyped = parser.parseMustEqualTyped(line);
         if (Objects.equals(mustEqualTyped.assigneeClass, mustEqualTyped.assignorClass) &&
                 Objects.equals(mustEqualTyped.assigneeSubMethodSig, mustEqualTyped.assignorSubMethodSig)) {

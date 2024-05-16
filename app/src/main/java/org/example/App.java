@@ -14,14 +14,36 @@ public class App {
         Parameters parameters = new Parameters();
         parameters.initFromArgs(args);
 
-        Driver driver = new Driver(parameters._example, parameters._mainClass, parameters._doopDir);
-        driver.setupSoot();
+        Driver driver = new Driver(parameters._example, parameters._mainClass, parameters._doopDir, parameters._inline,
+                !parameters._skipOptimize);
+        if (!parameters._inline && parameters._skipOptimize) {
+            throw new DootException("Please specify at least one operation from inline and optimization");
+        }
 
-        if (!parameters._skipDoop) {
-            driver.invokeDoop();
+        driver.setupInput();
+
+        if (parameters._inline) {
+            if (!parameters._skipDoop) {
+                driver.invokeDoopForInline();
+            }
+
+            driver.setupSootForInline();
+            driver.inline();
+
+            if (!parameters._skipOptimize) {
+                Options.v().set_output_format(Options.output_format_class);
+                PackManager.v().runPacks();
+                PackManager.v().writeOutput();
+                driver.generateJarFromInlineResult();
+            }
         }
 
         if (!parameters._skipOptimize) {
+            if (!parameters._skipDoop) {
+                driver.invokeDoopForOptimization();
+            }
+
+            driver.setupSootForOptimization();
             driver.optimize();
         }
 
@@ -36,6 +58,11 @@ public class App {
             default:
                 throw new DootException("Unsupported output format: " + parameters._outputFormat);
         }
+        PackManager.v().runPacks();
         PackManager.v().writeOutput();
+
+        if (!parameters._keepTmpDir) {
+            driver.removeTmpDir();
+        }
     }
 }

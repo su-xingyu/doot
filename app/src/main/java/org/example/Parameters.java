@@ -9,6 +9,8 @@ public class Parameters {
     public boolean _skipDoop = false;   // Only for test purpose
     public String _doopDir = "";    // Only for test purpose
     public boolean _skipOptimize = false;
+    public boolean _inline = false;
+    public boolean _keepTmpDir = false;
 
     public void initFromArgs(String[] args) throws DootException {
         processArgs(args);
@@ -57,6 +59,13 @@ public class Parameters {
                 break;
             case "--skip-optimize":
                 _skipOptimize = true;
+                break;
+            case "--inline":
+                _inline = true;
+                break;
+            case "--keep-tmp-dir":
+                _keepTmpDir = true;
+                break;
             default:
                 return -1;
         }
@@ -71,6 +80,5 @@ public class Parameters {
 
         return index + 1;
     }
-
 
 }

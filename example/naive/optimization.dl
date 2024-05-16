@@ -7,7 +7,6 @@ SerializerInputParam("<Naive: java.lang.String toHexString(java.lang.String)>", 
 
 // serializerOutputValue is treated as a special heap value to fit in the framework
 .decl Serializer(?serializerOutputValue:Value, ?input:Value, ?output:Var, ?method:Method)
-.output Serializer
 
 // --- Deserializer definition ---
 .decl isDeserializerMethod(?method:Method)
@@ -18,25 +17,18 @@ DeserializerInputParam("<Naive: java.lang.String fromHexString(java.lang.String)
 
 // deserializerOutputValue is treated as a special heap value to fit in the framework
 .decl Deserializer(?input:Var, ?output:Var, ?method:Method)
-.output Deserializer
 
 // --- Optimization definition ---
 .decl isInverse(?serializerMethod:Method, ?deserializerMethod:Method)
 isInverse("<Naive: java.lang.String toHexString(java.lang.String)>", "<Naive: java.lang.String fromHexString(java.lang.String)>").
 
 // Only within the context of serialization
-.decl MayAliasSerialized(?a:Var, ?b:Var)
-
-.decl MayEqual(?serializerInput:Value, ?deserializerOutput:Var)
-.output MayEqual
-
 .decl MustAliasSerialized(?a:Var, ?b:Var)
 
-.decl MustEqual(?serializerInput:Value, ?deserializerOutput:Var)
-.output MustEqual
+.decl ValuePairToOptimize(?serializerInput:Value, ?deserializerOutput:Var)
 
-.decl MustEqualTyped(?serializerInput: Value, ?deserializerOutput: Var, ?type: symbol)
-.output MustEqualTyped
+.decl ValuePairToOptimizeTyped(?serializerInput: Value, ?deserializerOutput: Var, ?type: symbol)
+.output ValuePairToOptimizeTyped
 
 // --- Rules ---
 // Reuse mainAnalysis.VarPointsTo for context-sensitive analysis
@@ -59,21 +51,10 @@ Deserializer(?input, ?output, ?inmethod) :-
     DeserializerInputParam(?inmethod, ?index),
     ActualParam(?index, ?invocation, ?input).
 
-MayAliasSerialized(?a, ?b) :-
-    Serializer(?serializerOutputValue, _, _, _),
-    mainAnalysis.VarPointsTo(_, ?serializerOutputValue, _, ?a),
-    mainAnalysis.VarPointsTo(_, ?serializerOutputValue, _, ?b).
-
-MayEqual(?serializerInput, ?deserializerOutput) :-
-    isInverse(?serializerMethod, ?deserializerMethod),
-    Serializer(_, ?serializerInput, ?serializerOutput, ?serializerMethod),
-    Deserializer(?deserializerInput, ?deserializerOutput, ?deserializerMethod),
-    MustAliasSerialized(?serializerOutput, ?deserializerInput).
-
 MustAliasSerialized(?a, ?a) :-
     Serializer(_, _, ?a, _).
 
-MustEqual(?serializerInput, ?deserializerOutput) :-
+ValuePairToOptimize(?serializerInput, ?deserializerOutput) :-
     isInverse(?serializerMethod, ?deserializerMethod),
     Serializer(_, ?serializerInput, ?serializerOutput, ?serializerMethod),
     Deserializer(?deserializerInput, ?deserializerOutput, ?deserializerMethod),
@@ -81,21 +62,21 @@ MustEqual(?serializerInput, ?deserializerOutput) :-
 
 // In Doop, string constants are represented as $stringConstant variables in its fact sets, we need to convert them
 // back to their string values
-MustEqualTyped(?stringConstantWithContext, ?deserializerOutput, "STRING") :-
-    MustEqual(?serializerInput, ?deserializerOutput),
+ValuePairToOptimizeTyped(?stringConstantWithContext, ?deserializerOutput, "STRING") :-
+    ValuePairToOptimize(?serializerInput, ?deserializerOutput),
     AssignHeapAllocation(?stringConstant, ?serializerInput, _),
     isStringConstant(?stringConstant),
     Var_DeclaringMethod(?serializerInput, ?method),
     ?stringConstantWithContext = cat(?method, cat("/", ?stringConstant)).
 
 // When ?serializerInput is a normal variable, we need to exclude the possibility of it being string constants
-MustEqualTyped(?serializerInput, ?deserializerOutput, "VAR") :-
-    MustEqual(?serializerInput, ?deserializerOutput),
+ValuePairToOptimizeTyped(?serializerInput, ?deserializerOutput, "VAR") :-
+    ValuePairToOptimize(?serializerInput, ?deserializerOutput),
     isVar(?serializerInput),
     AssignHeapAllocation(?heap, ?serializerInput, _),
     !isStringConstant(?heap).
 
-MustEqualTyped(?serializerInput, ?deserializerOutput, "VAR") :-
-    MustEqual(?serializerInput, ?deserializerOutput),
+ValuePairToOptimizeTyped(?serializerInput, ?deserializerOutput, "VAR") :-
+    ValuePairToOptimize(?serializerInput, ?deserializerOutput),
     isVar(?serializerInput),
     !AssignHeapAllocation(_, ?serializerInput, _).

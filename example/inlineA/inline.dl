@@ -1,0 +1,93 @@
+// --- Serializer definition ---
+.decl isSerializerMethod(?method:Method)
+isSerializerMethod("<InlineA: java.lang.String toHexString(java.lang.String)>").
+
+.decl SerializerInputParam(?method:Method, ?index:number)
+SerializerInputParam("<InlineA: java.lang.String toHexString(java.lang.String)>", 0).
+
+// serializerValue is treated as a special heap value to fit in the framework
+.decl Serializer(?serializerValue:Value, ?input:Value, ?output:Var, ?method:Method)
+
+// --- Deserializer definition ---
+.decl isDeserializerMethod(?method:Method)
+isDeserializerMethod("<InlineA: java.lang.String fromHexString(java.lang.String)>").
+
+.decl DeserializerInputParam(?method:Method, ?index:number)
+DeserializerInputParam("<InlineA: java.lang.String fromHexString(java.lang.String)>", 0).
+
+.decl Deserializer(?input:Var, ?output:Var, ?method:Method)
+
+// --- Inliner definition ---
+.decl isInverse(?serializerMethod:Method, ?deserializerMethod:Method)
+isInverse("<InlineA: java.lang.String toHexString(java.lang.String)>", "<InlineA: java.lang.String fromHexString(java.lang.String)>").
+
+.decl CandidateContextPair(?serializerCtx:mainAnalysis.configuration.HContext, ?deserializerCtx:mainAnalysis.configuration.Context)
+
+.decl CandidateInvocationPair(?serializerInvocation:MethodInvocation, ?deserializerInvocation:MethodInvocation)
+
+.decl CandidateMethods(?serializerCaller:Method, ?serializerCallee:Method, ?deserializerCaller:Method, ?deserializerCallee:Method)
+
+.decl MethodPairToInline(?caller:Method, ?callee:Method)
+.output MethodPairToInline
+
+// --- Rules ---
+// Reuse mainAnalysis.VarPointsTo for context-sensitive analysis
+// Must register the type of ?serializerValue to make things work
+mainAnalysis.Value_Type(?serializerValue, ?type),
+Serializer(?serializerValue, ?input, ?output, ?inmethod),
+mainAnalysis.configuration.RecordContextRequest(?ctx, ?serializerValue, ?output) :-
+    isSerializerMethod(?inmethod),
+    mainAnalysis.CallGraphEdge(?ctx, ?invocation, _, ?inmethod),
+    AssignReturnValue(?invocation, ?output),
+    SerializerInputParam(?inmethod, ?index),
+    ActualParam(?index, ?invocation, ?input),
+    Method_ReturnType(?inmethod, ?type),
+    ?serializerValue = cat("<", cat(?inmethod, cat(": ", cat(?input, ">")))).
+
+Deserializer(?input, ?output, ?inmethod) :-
+    isDeserializerMethod(?inmethod),
+    mainAnalysis.CallGraphEdge(_, ?invocation, _, ?inmethod),
+    AssignReturnValue(?invocation, ?output),
+    DeserializerInputParam(?inmethod, ?index),
+    ActualParam(?index, ?invocation, ?input).
+
+CandidateContextPair(?serializerCtx, ?deserializerCtx) :-
+    isInverse(?serializerMethod, ?deserializerMethod),
+    Serializer(?serializerValue, _, _, ?serializerMethod),
+    Deserializer(?deserializerInput, _, ?deserializerMethod),
+    mainAnalysis.VarPointsTo(?serializerCtx, ?serializerValue, ?deserializerCtx, ?deserializerInput).
+
+CandidateInvocationPair(?serializerInvocation, ?deserializerInvocation) :-
+    CandidateContextPair(?serializerCtx, ?deserializerCtx),
+    ?serializerCtx = [?serializerInvocation],
+    ?deserializerCtx = [?deserializerInvocation].
+
+CandidateMethods(?serializerCaller, ?serializerCallee, ?deserializerCaller, ?deserializerCallee) :-
+    CandidateInvocationPair(?serializerInvocation, ?deserializerInvocation),
+    Instruction_Method(?serializerInvocation, ?serializerCaller),
+    MethodInvocation_Method(?serializerInvocation, ?serializerCallee),
+    Instruction_Method(?deserializerInvocation, ?deserializerCaller),
+    MethodInvocation_Method(?deserializerInvocation, ?deserializerCallee).
+
+// Handle the case when one either serializer or deserializer is invoked in main method
+CandidateMethods(?serializerCaller, ?serializerCallee, "<<none>>", ?mainMethod) :-
+    CandidateInvocationPair(?serializerInvocation, "<<immutable-context>>"),
+    Instruction_Method(?serializerInvocation, ?serializerCaller),
+    MethodInvocation_Method(?serializerInvocation, ?serializerCallee),
+    basic.MainMethodDeclaration(?mainMethod).
+
+CandidateMethods("<<none>>", ?mainMethod, ?deserializerCaller, ?deserializerCallee) :-
+    CandidateInvocationPair("<<immutable-hcontext>>", ?deserializerInvocation),
+    Instruction_Method(?deserializerInvocation, ?deserializerCaller),
+    MethodInvocation_Method(?deserializerInvocation, ?deserializerCallee),
+    basic.MainMethodDeclaration(?mainMethod).
+
+MethodPairToInline(?meetPoint, ?serializerCallee),
+MethodPairToInline(?meetPoint, ?deserializerCallee) :-
+    CandidateMethods(?meetPoint, ?serializerCallee, ?meetPoint, ?deserializerCallee).
+
+MethodPairToInline(?meetPoint, ?serializerCallee) :-
+    CandidateMethods(?meetPoint, ?serializerCallee, _, ?meetPoint).
+
+MethodPairToInline(?meetPoint, ?deserializerCallee) :-
+    CandidateMethods(_, ?meetPoint, ?meetPoint, ?deserializerCallee).
