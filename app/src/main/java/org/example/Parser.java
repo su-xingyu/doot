@@ -1,13 +1,69 @@
 package org.example;
 
-import polyglot.ast.Do;
+import com.sun.istack.NotNull;
 
 public class Parser {
+    @NotNull
+    public ValuePairToOptimizeTyped parseValuePairToOptimizeTyped(@NotNull String line) throws DootException {
+        ValuePairToOptimizeTyped valuePairToOptimizeTyped = new ValuePairToOptimizeTyped();
+
+        String[] elements = line.split("\t");
+        if (elements.length != 3) {
+            throw new DootException("Bad input for parsing ValuePairToOptimizeTyped");
+        }
+
+        DoopValue assignor = parseDoopValue(elements[0]);
+        valuePairToOptimizeTyped.assignorClass = assignor.className;
+        valuePairToOptimizeTyped.assignorSubMethodSig = assignor.subMethodSig;
+        valuePairToOptimizeTyped.assignor = assignor.value;
+
+        switch (elements[2]) {
+            case "STRING":
+                valuePairToOptimizeTyped.assignorType = ValueType.STRING;
+                break;
+            case "VAR":
+                valuePairToOptimizeTyped.assignorType = ValueType.VAR;
+                break;
+            default:
+                throw new DootException("Undefined assignorType");
+        }
+
+        DoopValue assignee = parseDoopValue(elements[1]);
+        valuePairToOptimizeTyped.assigneeClass = assignee.className;
+        valuePairToOptimizeTyped.assigneeSubMethodSig = assignee.subMethodSig;
+        valuePairToOptimizeTyped.assignee = assignee.value;
+
+        return valuePairToOptimizeTyped;
+    }
+
+    @NotNull
+    private DoopValue parseDoopValue(@NotNull String doopVariable) throws DootException {
+        DoopValue variable = new DoopValue();
+
+        String[] elements = doopVariable.split("/");
+        if (elements.length != 2) {
+            throw new DootException("Bad input for parsing Variable");
+        }
+
+        variable.value = elements[1];
+
+        String[] sigElements = elements[0].substring(1, elements[0].length() - 1).split(":");
+        if (sigElements.length != 2) {
+            throw new DootException("Error parsing method signature");
+        }
+
+        variable.className = sigElements[0];
+        variable.subMethodSig = sigElements[1].trim();
+
+        return variable;
+    }
+
     public enum ValueType {
         VAR,
         STRING
     }
-    public class MustEqualTyped {
+
+    public static class ValuePairToOptimizeTyped {
         public String assigneeClass;
         public String assigneeSubMethodSig;
         public String assignee;
@@ -17,62 +73,9 @@ public class Parser {
         ValueType assignorType;
     }
 
-    private class Variable {
+    private static class DoopValue {
         public String className;
         public String subMethodSig;
-        public String varName;
-    }
-
-    public MustEqualTyped parseMustEqualTyped(String line) throws DootException {
-        MustEqualTyped mustEqualTyped = new MustEqualTyped();
-
-        String[] elements = line.split("\t");
-        if (elements.length != 3) {
-            throw new DootException("Bad input for parsing MustEqualTyped");
-        }
-
-        Variable assignor = parseVariable(elements[0]);
-        mustEqualTyped.assignorClass = assignor.className;
-        mustEqualTyped.assignorSubMethodSig = assignor.subMethodSig;
-        mustEqualTyped.assignor = assignor.varName;
-
-        switch (elements[2]) {
-            case "STRING":
-                mustEqualTyped.assignorType = ValueType.STRING;
-                break;
-            case "VAR":
-                mustEqualTyped.assignorType = ValueType.VAR;
-                break;
-            default:
-                throw new DootException("Undefined assignorType");
-        }
-
-        Variable assignee = parseVariable(elements[1]);
-        mustEqualTyped.assigneeClass = assignee.className;
-        mustEqualTyped.assigneeSubMethodSig = assignee.subMethodSig;
-        mustEqualTyped.assignee = assignee.varName;
-
-        return mustEqualTyped;
-    }
-
-    private Variable parseVariable(String doopVariable) throws DootException {
-        Variable variable = new Variable();
-
-        String[] elements = doopVariable.split("/");
-        if (elements.length != 2) {
-            throw new DootException("Bad input for parsing Variable");
-        }
-
-        variable.varName = elements[1];
-
-        String[] sigElements = elements[0].substring(1, elements[0].length()-1).split(":");
-        if (sigElements.length != 2) {
-            throw new DootException("Error parsing method signature");
-        }
-
-        variable.className = sigElements[0];
-        variable.subMethodSig = sigElements[1].trim();
-
-        return variable;
+        public String value;
     }
 }

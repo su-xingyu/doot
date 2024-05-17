@@ -1,6 +1,12 @@
 package org.example;
 
-import soot.*;
+import com.sun.istack.NotNull;
+import com.sun.istack.Nullable;
+import org.apache.log4j.Logger;
+import soot.Body;
+import soot.Scene;
+import soot.SootMethod;
+import soot.Unit;
 import soot.jimple.InvokeExpr;
 import soot.jimple.Stmt;
 import soot.jimple.toolkits.invoke.SiteInliner;
@@ -15,15 +21,17 @@ import java.util.List;
 import java.util.Objects;
 
 public class Inliner {
-    private final Path doopDir;
+    private static final Logger logger = Logger.getLogger(Inliner.class);
 
-    public Inliner(Path doopDir) {
-        this.doopDir = doopDir;
+    private final Path doopResultDir;
+
+    public Inliner(Path doopResultDir) {
+        this.doopResultDir = doopResultDir;
     }
 
     public void inline() throws IOException, DootException {
         BufferedReader bufferedReader = new BufferedReader(
-                new FileReader(doopDir + File.separator + "last-analysis/MethodPairToInline.csv"));
+                new FileReader(doopResultDir + File.separator + "MethodPairToInline.csv"));
 
         String line = bufferedReader.readLine();
         while (line != null) {
@@ -34,7 +42,8 @@ public class Inliner {
         }
     }
 
-    private void inlineOnce(String line) throws DootException {
+    private void inlineOnce(@NotNull String line) throws DootException {
+        logger.debug("Inlining method pair: " + line);
         String[] methodPair = line.split("\t");
         if (methodPair.length != 2) {
             throw new DootException("Bad input from inline analysis result");
@@ -43,7 +52,7 @@ public class Inliner {
         inlineMethodPair(methodPair[0], methodPair[1]);
     }
 
-    private void inlineMethodPair(String caller, String callee) {
+    private void inlineMethodPair(@NotNull String caller, @Nullable String callee) {
         SootMethod callerMethod = Scene.v().getMethod(caller);
         SootMethod calleeMethod = Scene.v().getMethod(callee);
 
@@ -51,9 +60,11 @@ public class Inliner {
             callerMethod.retrieveActiveBody();
         }
         if (!calleeMethod.hasActiveBody()) {
-             calleeMethod.retrieveActiveBody();
+            calleeMethod.retrieveActiveBody();
         }
 
+        // We cannot inline while traversing each unit. This will lead to concurrency issue. Need to store the
+        // statements to be lined first
         List<Stmt> stmtToInline = new ArrayList<>();
 
         Body callerBody = callerMethod.getActiveBody();

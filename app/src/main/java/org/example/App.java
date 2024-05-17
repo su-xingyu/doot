@@ -15,14 +15,12 @@ public class App {
         parameters.initFromArgs(args);
 
         Driver driver = new Driver(parameters._example, parameters._mainClass, parameters._doopDir, parameters._inline,
-                !parameters._skipOptimize);
-        if (!parameters._inline && parameters._skipOptimize) {
-            throw new DootException("Please specify at least one operation from inline and optimization");
-        }
+                parameters._optimize);
 
         driver.setupInput();
 
         if (parameters._inline) {
+            // For test purpose, sometimes we want to skip Doop invocation and use cached results
             if (!parameters._skipDoop) {
                 driver.invokeDoopForInline();
             }
@@ -30,7 +28,8 @@ public class App {
             driver.setupSootForInline();
             driver.inline();
 
-            if (!parameters._skipOptimize) {
+            // Write inline results to tmp directory for later use of optimization
+            if (parameters._optimize) {
                 Options.v().set_output_format(Options.output_format_class);
                 PackManager.v().runPacks();
                 PackManager.v().writeOutput();
@@ -38,7 +37,7 @@ public class App {
             }
         }
 
-        if (!parameters._skipOptimize) {
+        if (parameters._optimize) {
             if (!parameters._skipDoop) {
                 driver.invokeDoopForOptimization();
             }
@@ -52,7 +51,11 @@ public class App {
                 Options.v().set_output_format(Options.output_format_shimple);
                 break;
             case "class":
-                driver.transformAllToJimpleBodies();
+                // If we enable optimization, methods will have Shimple bodies at this point. Soot doesn't compile over
+                // Shimple bodies.
+                if (parameters._optimize) {
+                    driver.transformAllToJimpleBodies();
+                }
                 Options.v().set_output_format(Options.output_format_class);
                 break;
             default:

@@ -1,5 +1,6 @@
 package org.example;
 
+import com.sun.istack.NotNull;
 import org.apache.log4j.Logger;
 import soot.*;
 import soot.jimple.AssignStmt;
@@ -18,17 +19,17 @@ public class Optimizer {
     private static final Logger logger = Logger.getLogger(Optimizer.class);
     private final Parser parser;
 
-    private final Path doopDir;
+    private final Path doopResultDir;
 
-    public Optimizer(Path doopDir) {
+    public Optimizer(@NotNull Path doopResultDir) {
         this.parser = new Parser();
 
-        this.doopDir = doopDir;
+        this.doopResultDir = doopResultDir;
     }
 
     public void optimize() throws DootException, IOException {
         BufferedReader bufferedReader = new BufferedReader(
-                new FileReader(doopDir + File.separator + "last-analysis/ValuePairToOptimizeTyped.csv"));
+                new FileReader(doopResultDir + File.separator + "ValuePairToOptimizeTyped.csv"));
 
         String line = bufferedReader.readLine();
         while (line != null) {
@@ -37,19 +38,25 @@ public class Optimizer {
         }
     }
 
-    private void optimizeOnce(String line) throws DootException {
-        logger.debug("Optimizing value pair: " + line);
-        Parser.MustEqualTyped mustEqualTyped = parser.parseMustEqualTyped(line);
-        if (Objects.equals(mustEqualTyped.assigneeClass, mustEqualTyped.assignorClass) &&
-                Objects.equals(mustEqualTyped.assigneeSubMethodSig, mustEqualTyped.assignorSubMethodSig)) {
-            // No inlining
-            optimizeInverseVariables(mustEqualTyped.assigneeClass, mustEqualTyped.assigneeSubMethodSig,
-                    mustEqualTyped.assignee, mustEqualTyped.assignor, mustEqualTyped.assignorType);
+    private void optimizeOnce(@NotNull String line) throws DootException {
+        logger.debug("Optimizing value pair (typed): " + line);
+        Parser.ValuePairToOptimizeTyped valuePairToOptimizeTyped = parser.parseValuePairToOptimizeTyped(line);
+        // Since MustAlias analysis is intra-procedural, the if condition should always be true. This is just a sanity
+        // check
+        if (Objects.equals(valuePairToOptimizeTyped.assigneeClass, valuePairToOptimizeTyped.assignorClass) &&
+                Objects.equals(valuePairToOptimizeTyped.assigneeSubMethodSig,
+                        valuePairToOptimizeTyped.assignorSubMethodSig)) {
+            optimizeValuePair(valuePairToOptimizeTyped.assigneeClass, valuePairToOptimizeTyped.assigneeSubMethodSig,
+                    valuePairToOptimizeTyped.assignee, valuePairToOptimizeTyped.assignor,
+                    valuePairToOptimizeTyped.assignorType);
         }
     }
 
-    private void optimizeInverseVariables(String className, String subMethodSig, String assignee, String assignor,
-                                          Parser.ValueType assignorType) throws DootException {
+    private void optimizeValuePair(@NotNull String className,
+                                   @NotNull String subMethodSig,
+                                   @NotNull String assignee,
+                                   @NotNull String assignor,
+                                   @NotNull Parser.ValueType assignorType) throws DootException {
         SootClass sootClass = Scene.v().getSootClass(className);
         SootMethod sootMethod = sootClass.getMethod(subMethodSig);
         Body body = sootMethod.getActiveBody();
@@ -88,12 +95,13 @@ public class Optimizer {
         throw new DootException("No optimization opportunity found");
     }
 
-    private Value getVariableByName(Body body, String varName) throws DootException {
+    @NotNull
+    private Value getVariableByName(@NotNull Body body, @NotNull String varName) throws DootException {
         for (Unit unit : body.getUnits()) {
             if (unit instanceof DefinitionStmt) {
                 for (ValueBox valueBox : unit.getDefBoxes()) {
                     Value value = valueBox.getValue();
-                    if ((value instanceof Local) && (((Local) value).getName() == varName)) {
+                    if ((value instanceof Local) && (Objects.equals(((Local) value).getName(), varName))) {
                         return value;
                     }
                 }

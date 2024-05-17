@@ -1,18 +1,19 @@
 package org.example;
 
+import com.sun.istack.NotNull;
+import com.sun.istack.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Logger;
 import org.example.doop.DoopConventions;
 import org.example.doop.DoopRenamer;
 import soot.*;
-import soot.jimple.*;
-import soot.jimple.toolkits.invoke.SiteInliner;
+import soot.jimple.JimpleBody;
 import soot.options.Options;
 import soot.shimple.Shimple;
 import soot.shimple.ShimpleBody;
 
-import javax.annotation.Nullable;
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -22,13 +23,12 @@ public class Driver {
     private static final Logger logger = Logger.getLogger(Driver.class);
 
     private final Path doopDir;
+    private final Path doopResultDir;
     private final Optimizer optimizer;
     private final Inliner inliner;
 
-    private final String example;
     private final String mainClass;
 
-    private final Path baseDir;
     private final Path exampleDir;
     private final Path logDir;
     private final Path outputDir;
@@ -39,15 +39,19 @@ public class Driver {
     private final boolean inlineEnabled;
     private final boolean optimizeEnabled;
 
-    public Driver(String example, String mainClass, String doopDir, boolean inlineEnabled, boolean optimizeEnabled) {
-        this.doopDir = Paths.get(doopDir);
-        this.optimizer = new Optimizer(this.doopDir);
-        this.inliner = new Inliner(this.doopDir);
+    public Driver(@NotNull final String example,
+                  @NotNull final String mainClass,
+                  @NotNull final Path doopDir,
+                  boolean inlineEnabled,
+                  boolean optimizeEnabled) {
+        this.doopDir = doopDir;
+        this.doopResultDir = Paths.get(doopDir + File.separator + "last-analysis");
+        this.optimizer = new Optimizer(doopResultDir);
+        this.inliner = new Inliner(doopResultDir);
 
-        this.example = example;
         this.mainClass = mainClass;
 
-        this.baseDir = Paths.get(System.getProperty("user.dir")).getParent();
+        Path baseDir = Paths.get(System.getProperty("user.dir")).getParent();
         this.exampleDir = Paths.get(baseDir + File.separator + "example" + File.separator + example);
         this.logDir = Paths.get(baseDir + File.separator + "log");
         this.outputDir = Paths.get(baseDir + File.separator + "output");
@@ -81,9 +85,9 @@ public class Driver {
         }
     }
 
-    private void executeCommand(String command, @Nullable Path directory, @Nullable Path outputFile)
+    private void executeCommand(@NotNull String command, @Nullable Path directory, @Nullable Path outputFile)
             throws IOException, InterruptedException {
-        String[] bashCommand = new String[] {"bash", "-c", command};
+        String[] bashCommand = new String[]{"bash", "-c", command};
         ProcessBuilder builder = new ProcessBuilder(bashCommand);
         if (directory != null) {
             logger.debug("Temporarily changed to directory: " + directory);
@@ -108,6 +112,7 @@ public class Driver {
         G.reset();
 
         Options.v().set_src_prec(Options.src_prec_only_class);
+        // If optimization is enabled, we write inline results to a temporary directory. Otherwise, to output directory
         if (optimizeEnabled) {
             Options.v().set_output_dir(inlineResultDir.toString());
         } else {
@@ -116,6 +121,8 @@ public class Driver {
         Options.v().set_process_dir(Collections.singletonList(inputDir.toString()));
         Options.v().set_main_class(this.mainClass);
 
+        // We don't need to apply Doop setting here because we are only interested in method signature for inlining,
+        // which remain consistent across different settings
         Options.v().set_allow_phantom_refs(true);
 
         Scene.v().loadNecessaryClasses();
@@ -126,6 +133,7 @@ public class Driver {
 
         Options.v().set_src_prec(Options.src_prec_only_class);
         Options.v().set_output_dir(outputDir.toString());
+        // If inlining is enabled, we read from inline result directory. Otherwise, from input directory
         if (inlineEnabled) {
             Options.v().set_process_dir(Collections.singletonList(inlineResultDir.toString()));
         } else {
@@ -133,6 +141,8 @@ public class Driver {
         }
         Options.v().set_main_class(this.mainClass);
 
+        // To bypass the issue that Soot doesn't provide a Shimple parser, we need to apply Doop configurations while
+        // loading the input to keep variable names consistent between Doop and our application
         applyDoopSettings();
 
         Scene.v().loadNecessaryClasses();
@@ -157,7 +167,6 @@ public class Driver {
         // We are only interested in application classes
         for (SootClass sootClass : Scene.v().getApplicationClasses()) {
             for (SootMethod sootMethod : sootClass.getMethods()) {
-                // System.out.println(sootMethod.getSubSignature());
                 transformToDoopBody(sootMethod);
             }
         }
@@ -166,7 +175,7 @@ public class Driver {
     /*
      * This method is adapted from Doop - FactGenerator: generate
      */
-    private void transformToDoopBody(SootMethod sootMethod) {
+    private void transformToDoopBody(@NotNull SootMethod sootMethod) {
         if (sootMethod.isPhantom()) {
             return;
         }
@@ -199,7 +208,7 @@ public class Driver {
         }
     }
 
-    private void transformToJimpleBody(SootMethod sootMethod) throws DootException {
+    private void transformToJimpleBody(@NotNull SootMethod sootMethod) throws DootException {
         if (sootMethod.isPhantom()) {
             return;
         }
@@ -213,13 +222,11 @@ public class Driver {
             try {
                 if (b0 != null) {
                     if (b0 instanceof JimpleBody) {
-                        return;
-                    }
-                    else if (b0 instanceof ShimpleBody) {
+                        // Body already in Jimple format, do nothing
+                    } else if (b0 instanceof ShimpleBody) {
                         Body b = ((ShimpleBody) b0).toJimpleBody();
                         sootMethod.setActiveBody(b);
-                    }
-                    else {
+                    } else {
                         throw new DootException("Unsupported body type for Jimple body transformation");
                     }
                 }
@@ -238,11 +245,16 @@ public class Driver {
             Files.createDirectories(logDir);
         }
 
+        // Clear results from previous execution
+        if (Files.exists(doopResultDir)) {
+            FileUtils.deleteDirectory(doopResultDir.toFile());
+        }
+
         Path optimizeInputDir;
+        // If inlining is enabled, we read from inline result directory. Otherwise, from input directory
         if (inlineEnabled) {
             optimizeInputDir = inlineResultDir;
-        }
-        else {
+        } else {
             optimizeInputDir = inputDir;
         }
 
@@ -265,6 +277,11 @@ public class Driver {
     public void invokeDoopForInline() throws IOException, InterruptedException {
         if (!Files.exists(logDir)) {
             Files.createDirectories(logDir);
+        }
+
+        // Clear results from previous execution
+        if (Files.exists(doopResultDir)) {
+            FileUtils.deleteDirectory(doopResultDir.toFile());
         }
 
         // Only 1-call-site-sensitivity+heap analysis is implemented
