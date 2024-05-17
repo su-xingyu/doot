@@ -1,25 +1,25 @@
 // --- Serializer definition ---
 .decl isSerializerMethod(?method:Method)
-isSerializerMethod("<InlineA: java.lang.String toHexString(java.lang.String)>").
+isSerializerMethod("<InlineC: java.lang.String toHexString(java.lang.String)>").
 
 .decl SerializerInputParam(?method:Method, ?index:number)
-SerializerInputParam("<InlineA: java.lang.String toHexString(java.lang.String)>", 0).
+SerializerInputParam("<InlineC: java.lang.String toHexString(java.lang.String)>", 0).
 
 // serializerValue is treated as a special heap value to fit in the framework
 .decl Serializer(?serializerValue:Value, ?input:Value, ?output:Var, ?method:Method)
 
 // --- Deserializer definition ---
 .decl isDeserializerMethod(?method:Method)
-isDeserializerMethod("<InlineA: java.lang.String fromHexString(java.lang.String)>").
+isDeserializerMethod("<InlineC: java.lang.String fromHexString(java.lang.String)>").
 
 .decl DeserializerInputParam(?method:Method, ?index:number)
-DeserializerInputParam("<InlineA: java.lang.String fromHexString(java.lang.String)>", 0).
+DeserializerInputParam("<InlineC: java.lang.String fromHexString(java.lang.String)>", 0).
 
 .decl Deserializer(?input:Var, ?output:Var, ?method:Method)
 
 // --- Inliner definition ---
 .decl isInverse(?serializerMethod:Method, ?deserializerMethod:Method)
-isInverse("<InlineA: java.lang.String toHexString(java.lang.String)>", "<InlineA: java.lang.String fromHexString(java.lang.String)>").
+isInverse("<InlineC: java.lang.String toHexString(java.lang.String)>", "<InlineC: java.lang.String fromHexString(java.lang.String)>").
 
 .decl CandidateContextPair(?serializerCtx:mainAnalysis.configuration.HContext, ?deserializerCtx:mainAnalysis.configuration.Context)
 

@@ -65,8 +65,8 @@ public class Driver {
 
     public void setupInput() throws IOException, InterruptedException {
         // Clear the results from previous executions
-        if (Files.exists(inputDir)) {
-            FileUtils.deleteDirectory(inputDir.toFile());
+        if (Files.exists(tmpDir)) {
+            FileUtils.deleteDirectory(tmpDir.toFile());
         }
 
         logger.debug("Copying input files to " + inputDir);

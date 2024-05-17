@@ -3,10 +3,11 @@ import java.io.FileReader;
 import java.io.BufferedReader;
 import java.io.IOException;
 
-public class Naive {
+public class OptimizeVar {
     public static void main(String[] args) throws IOException {
         String text = "Hello, World!";
-        String encoded = toHexString(text);
+        String textUpper = text.toUpperCase();
+        String encoded = toHexString(textUpper);
         String decoded = fromHexString(encoded);
         System.out.println("Encoded: " + encoded);
         System.out.println("Decoded: " + decoded);

@@ -1,26 +1,26 @@
 // --- Serializer definition ---
 .decl isSerializerMethod(?method:Method)
-isSerializerMethod("<Naive: java.lang.String toHexString(java.lang.String)>").
+isSerializerMethod("<InlineC: java.lang.String toHexString(java.lang.String)>").
 
 .decl SerializerInputParam(?method:Method, ?index:number)
-SerializerInputParam("<Naive: java.lang.String toHexString(java.lang.String)>", 0).
+SerializerInputParam("<InlineC: java.lang.String toHexString(java.lang.String)>", 0).
 
 // serializerOutputValue is treated as a special heap value to fit in the framework
 .decl Serializer(?serializerOutputValue:Value, ?input:Value, ?output:Var, ?method:Method)
 
 // --- Deserializer definition ---
 .decl isDeserializerMethod(?method:Method)
-isDeserializerMethod("<Naive: java.lang.String fromHexString(java.lang.String)>").
+isDeserializerMethod("<InlineC: java.lang.String fromHexString(java.lang.String)>").
 
 .decl DeserializerInputParam(?method:Method, ?index:number)
-DeserializerInputParam("<Naive: java.lang.String fromHexString(java.lang.String)>", 0).
+DeserializerInputParam("<InlineC: java.lang.String fromHexString(java.lang.String)>", 0).
 
 // deserializerOutputValue is treated as a special heap value to fit in the framework
 .decl Deserializer(?input:Var, ?output:Var, ?method:Method)
 
 // --- Optimization definition ---
 .decl isInverse(?serializerMethod:Method, ?deserializerMethod:Method)
-isInverse("<Naive: java.lang.String toHexString(java.lang.String)>", "<Naive: java.lang.String fromHexString(java.lang.String)>").
+isInverse("<InlineC: java.lang.String toHexString(java.lang.String)>", "<InlineC: java.lang.String fromHexString(java.lang.String)>").
 
 // Only within the context of serialization
 .decl MustAliasSerialized(?a:Var, ?b:Var)

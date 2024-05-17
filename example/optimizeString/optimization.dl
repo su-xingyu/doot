@@ -1,0 +1,82 @@
+// --- Serializer definition ---
+.decl isSerializerMethod(?method:Method)
+isSerializerMethod("<OptimizeString: java.lang.String toHexString(java.lang.String)>").
+
+.decl SerializerInputParam(?method:Method, ?index:number)
+SerializerInputParam("<OptimizeString: java.lang.String toHexString(java.lang.String)>", 0).
+
+// serializerOutputValue is treated as a special heap value to fit in the framework
+.decl Serializer(?serializerOutputValue:Value, ?input:Value, ?output:Var, ?method:Method)
+
+// --- Deserializer definition ---
+.decl isDeserializerMethod(?method:Method)
+isDeserializerMethod("<OptimizeString: java.lang.String fromHexString(java.lang.String)>").
+
+.decl DeserializerInputParam(?method:Method, ?index:number)
+DeserializerInputParam("<OptimizeString: java.lang.String fromHexString(java.lang.String)>", 0).
+
+// deserializerOutputValue is treated as a special heap value to fit in the framework
+.decl Deserializer(?input:Var, ?output:Var, ?method:Method)
+
+// --- Optimization definition ---
+.decl isInverse(?serializerMethod:Method, ?deserializerMethod:Method)
+isInverse("<OptimizeString: java.lang.String toHexString(java.lang.String)>", "<OptimizeString: java.lang.String fromHexString(java.lang.String)>").
+
+// Only within the context of serialization
+.decl MustAliasSerialized(?a:Var, ?b:Var)
+
+.decl ValuePairToOptimize(?serializerInput:Value, ?deserializerOutput:Var)
+
+.decl ValuePairToOptimizeTyped(?serializerInput: Value, ?deserializerOutput: Var, ?type: symbol)
+.output ValuePairToOptimizeTyped
+
+// --- Rules ---
+// Reuse mainAnalysis.VarPointsTo for context-sensitive analysis
+// Must register the type of ?serializerOutputValue to make things work
+mainAnalysis.Value_Type(?serializerOutputValue, ?type),
+Serializer(?serializerOutputValue, ?input, ?output, ?inmethod),
+mainAnalysis.configuration.RecordContextRequest(?ctx, ?serializerOutputValue, ?output) :-
+    isSerializerMethod(?inmethod),
+    mainAnalysis.CallGraphEdge(?ctx, ?invocation, _, ?inmethod),
+    AssignReturnValue(?invocation, ?output),
+    SerializerInputParam(?inmethod, ?index),
+    ActualParam(?index, ?invocation, ?input),
+    Method_ReturnType(?inmethod, ?type),
+    ?serializerOutputValue = cat("<", cat(?inmethod, cat(": ", cat(?input, ">")))).
+
+Deserializer(?input, ?output, ?inmethod) :-
+    isDeserializerMethod(?inmethod),
+    mainAnalysis.CallGraphEdge(_, ?invocation, _, ?inmethod),
+    AssignReturnValue(?invocation, ?output),
+    DeserializerInputParam(?inmethod, ?index),
+    ActualParam(?index, ?invocation, ?input).
+
+MustAliasSerialized(?a, ?a) :-
+    Serializer(_, _, ?a, _).
+
+ValuePairToOptimize(?serializerInput, ?deserializerOutput) :-
+    isInverse(?serializerMethod, ?deserializerMethod),
+    Serializer(_, ?serializerInput, ?serializerOutput, ?serializerMethod),
+    Deserializer(?deserializerInput, ?deserializerOutput, ?deserializerMethod),
+    MustAliasSerialized(?serializerOutput, ?deserializerInput).
+
+// In Doop, string constants are represented as $stringConstant variables in its fact sets, we need to convert them
+// back to their string values
+ValuePairToOptimizeTyped(?stringConstantWithContext, ?deserializerOutput, "STRING") :-
+    ValuePairToOptimize(?serializerInput, ?deserializerOutput),
+    AssignHeapAllocation(?stringConstant, ?serializerInput, _),
+    isStringConstant(?stringConstant),
+    Var_DeclaringMethod(?serializerInput, ?method),
+    ?stringConstantWithContext = cat(?method, cat("/", ?stringConstant)).
+
+// When ?serializerInput is a normal variable, we need to exclude the possibility of it being string constants
+ValuePairToOptimizeTyped(?serializerInput, ?deserializerOutput, "VAR") :-
+    ValuePairToOptimize(?serializerInput, ?deserializerOutput),
+    isVar(?serializerInput),
+    AssignHeapAllocation(?heap, ?serializerInput, _),
+    !isStringConstant(?heap).
+
+ValuePairToOptimizeTyped(?serializerInput, ?deserializerOutput, "VAR") :-
+    ValuePairToOptimize(?serializerInput, ?deserializerOutput),
+    isVar(?serializerInput),
+    !AssignHeapAllocation(_, ?serializerInput, _).
