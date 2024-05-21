@@ -8,6 +8,8 @@ SerializerInputParam("<InlineA: java.lang.String toHexString(java.lang.String)>"
 // serializerValue is treated as a special heap value to fit in the framework
 .decl Serializer(?serializerValue:Value, ?input:Value, ?output:Var, ?method:Method)
 
+.decl isSerializerValue(?serializerValue:Value)
+
 // --- Deserializer definition ---
 .decl isDeserializerMethod(?method:Method)
 isDeserializerMethod("<InlineA: java.lang.String fromHexString(java.lang.String)>").
@@ -21,11 +23,11 @@ DeserializerInputParam("<InlineA: java.lang.String fromHexString(java.lang.Strin
 .decl isInverse(?serializerMethod:Method, ?deserializerMethod:Method)
 isInverse("<InlineA: java.lang.String toHexString(java.lang.String)>", "<InlineA: java.lang.String fromHexString(java.lang.String)>").
 
-.decl CandidateContextPair(?serializerCtx:mainAnalysis.configuration.HContext, ?deserializerCtx:mainAnalysis.configuration.Context)
+.decl CandidateContextPair(?serializerCtx:mainAnalysis.configuration.HContext, ?varCtx:mainAnalysis.configuration.Context)
 
-.decl CandidateInvocationPair(?serializerInvocation:MethodInvocation, ?deserializerInvocation:MethodInvocation)
+.decl CandidateInvocationPair(?serializerInvocation:MethodInvocation, ?varInvocation:MethodInvocation)
 
-.decl CandidateMethods(?serializerCaller:Method, ?serializerCallee:Method, ?deserializerCaller:Method, ?deserializerCallee:Method)
+.decl CandidateMethods(?serializerCaller:Method, ?serializerCallee:Method, ?varCaller:Method, ?varCallee:Method)
 
 .decl MethodPairToInline(?caller:Method, ?callee:Method)
 .output MethodPairToInline
@@ -36,6 +38,7 @@ isInverse("<InlineA: java.lang.String toHexString(java.lang.String)>", "<InlineA
 // Must register the type of ?serializerValue to make things work
 mainAnalysis.Value_Type(?serializerValue, ?type),
 Serializer(?serializerValue, ?input, ?output, ?inmethod),
+isSerializerValue(?serializerValue),
 mainAnalysis.configuration.RecordContextRequest(?ctx, ?serializerValue, ?output) :-
     isSerializerMethod(?inmethod),
     mainAnalysis.CallGraphEdge(?ctx, ?invocation, _, ?inmethod),
@@ -58,37 +61,47 @@ CandidateContextPair(?serializerCtx, ?deserializerCtx) :-
     Deserializer(?deserializerInput, _, ?deserializerMethod),
     mainAnalysis.VarPointsTo(?serializerCtx, ?serializerValue, ?deserializerCtx, ?deserializerInput).
 
-CandidateInvocationPair(?serializerInvocation, ?deserializerInvocation) :-
-    CandidateContextPair(?serializerCtx, ?deserializerCtx),
-    ?serializerCtx = [?serializerInvocation],
-    ?deserializerCtx = [?deserializerInvocation].
+// We also want to inline intermediate variables
+CandidateContextPair(?serializerCtx, ?varCtx) :-
+    CandidateContextPair(?serializerCtx, _),
+    mainAnalysis.VarPointsTo(?serializerCtx, ?serializerValue, ?varCtx, _),
+    isSerializerValue(?serializerValue).
 
-CandidateMethods(?serializerCaller, ?serializerCallee, ?deserializerCaller, ?deserializerCallee) :-
-    CandidateInvocationPair(?serializerInvocation, ?deserializerInvocation),
+CandidateInvocationPair(?serializerInvocation, ?varInvocation) :-
+    CandidateContextPair(?serializerCtx, ?varCtx),
+    ?serializerCtx = [?serializerInvocation],
+    ?varCtx = [?varInvocation].
+
+CandidateMethods(?serializerCaller, ?serializerCallee, ?varCaller, ?varCallee) :-
+    CandidateInvocationPair(?serializerInvocation, ?varInvocation),
     Instruction_Method(?serializerInvocation, ?serializerCaller),
     MethodInvocation_Method(?serializerInvocation, ?serializerCallee),
-    Instruction_Method(?deserializerInvocation, ?deserializerCaller),
-    MethodInvocation_Method(?deserializerInvocation, ?deserializerCallee).
+    Instruction_Method(?varInvocation, ?varCaller),
+    MethodInvocation_Method(?varInvocation, ?varCallee).
 
-// Handle the case when one either serializer or deserializer is invoked in main method
+// Handle the case when one either serializer or targeted variable is in main method
 CandidateMethods(?serializerCaller, ?serializerCallee, "<<none>>", ?mainMethod) :-
     CandidateInvocationPair(?serializerInvocation, "<<immutable-context>>"),
     Instruction_Method(?serializerInvocation, ?serializerCaller),
     MethodInvocation_Method(?serializerInvocation, ?serializerCallee),
     basic.MainMethodDeclaration(?mainMethod).
 
-CandidateMethods("<<none>>", ?mainMethod, ?deserializerCaller, ?deserializerCallee) :-
-    CandidateInvocationPair("<<immutable-context>>", ?deserializerInvocation),
-    Instruction_Method(?deserializerInvocation, ?deserializerCaller),
-    MethodInvocation_Method(?deserializerInvocation, ?deserializerCallee),
+CandidateMethods("<<none>>", ?mainMethod, ?varCaller, ?varCallee) :-
+    CandidateInvocationPair("<<immutable-context>>", ?varInvocation),
+    Instruction_Method(?varInvocation, ?varCaller),
+    MethodInvocation_Method(?varInvocation, ?varCallee),
     basic.MainMethodDeclaration(?mainMethod).
 
+// Since we also inline intermediate variables, we need to exclude the possibility of ?varCallee being
+// deserializer itself
 MethodPairToInline(?meetPoint, ?serializerCallee),
-MethodPairToInline(?meetPoint, ?deserializerCallee) :-
-    CandidateMethods(?meetPoint, ?serializerCallee, ?meetPoint, ?deserializerCallee).
+MethodPairToInline(?meetPoint, ?varCallee) :-
+    CandidateMethods(?meetPoint, ?serializerCallee, ?meetPoint, ?varCallee),
+    !isDeserializerMethod(?varCallee).
 
 MethodPairToInline(?meetPoint, ?serializerCallee) :-
     CandidateMethods(?meetPoint, ?serializerCallee, _, ?meetPoint).
 
-MethodPairToInline(?meetPoint, ?deserializerCallee) :-
-    CandidateMethods(_, ?meetPoint, ?meetPoint, ?deserializerCallee).
+MethodPairToInline(?meetPoint, ?varCallee) :-
+    CandidateMethods(_, ?meetPoint, ?meetPoint, ?varCallee),
+    !isDeserializerMethod(?varCallee).

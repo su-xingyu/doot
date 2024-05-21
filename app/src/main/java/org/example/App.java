@@ -30,10 +30,12 @@ public class App {
 
             // Write inline results to tmp directory for later use of optimization
             if (parameters._optimize) {
-                Options.v().set_output_format(Options.output_format_class);
+                Options.v().set_output_format(Options.output_format_dava);
                 PackManager.v().runPacks();
                 PackManager.v().writeOutput();
-                driver.generateJarFromInlineResult();
+                // Recompile to .class files to exploit default optimizations of javac after inlining to remove
+                // redundant basic blocks
+                driver.generateInputFromInlineResult();
             }
         }
 

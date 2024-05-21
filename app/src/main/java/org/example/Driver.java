@@ -103,9 +103,21 @@ public class Driver {
         process.waitFor();
     }
 
-    public void generateJarFromInlineResult() throws IOException, InterruptedException {
-        String command = "jar -cfe " + mainClass + ".jar " + mainClass + " *.class";
-        executeCommand(command, inlineResultDir, null);
+    public void generateInputFromInlineResult() throws IOException, InterruptedException, DootException {
+        if (!Files.exists(inlineResultDir)) {
+            throw new DootException("Inline results should have been generated");
+        }
+
+        Path davaDir = Paths.get(inlineResultDir + File.separator + "dava");
+        Path davaSrcDir = Paths.get(davaDir + File.separator + "src");
+        FileUtils.copyDirectory(davaSrcDir.toFile(), inlineResultDir.toFile());
+        FileUtils.deleteDirectory(davaDir.toFile());
+
+        String command1 = "javac *.java";
+        executeCommand(command1, inlineResultDir, null);
+
+        String command2 = "jar -cfe " + mainClass + ".jar " + mainClass + " *.class";
+        executeCommand(command2, inlineResultDir, null);
     }
 
     public void setupSootForInline() throws DootException {
@@ -263,6 +275,8 @@ public class Driver {
                 + "-a context-insensitive "
                 + "-i " + optimizeInputDir + File.separator + mainClass + ".jar "
                 + "--extra-logic " + inputDir + File.separator + "optimization.dl "
+                + "--app-only "
+                + "--cfg "
                 + "--stats none";
         logger.debug("Invoking doop");
 
@@ -289,6 +303,7 @@ public class Driver {
                 + "-a 1-call-site-sensitive+heap "
                 + "-i " + inputDir + File.separator + mainClass + ".jar "
                 + "--extra-logic " + inputDir + File.separator + "inline.dl "
+                + "--app-only "
                 + "--stats none";
         logger.debug("Invoking doop");
 
