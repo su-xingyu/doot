@@ -79,7 +79,7 @@ CandidateMethods(?serializerCaller, ?serializerCallee, ?varCaller, ?varCallee) :
     Instruction_Method(?varInvocation, ?varCaller),
     MethodInvocation_Method(?varInvocation, ?varCallee).
 
-// Handle the case when one either serializer or targeted variable is in main method
+// Handle the case when either serializer or targeted variable is in main method
 CandidateMethods(?serializerCaller, ?serializerCallee, "<<none>>", ?mainMethod) :-
     CandidateInvocationPair(?serializerInvocation, "<<immutable-context>>"),
     Instruction_Method(?serializerInvocation, ?serializerCaller),

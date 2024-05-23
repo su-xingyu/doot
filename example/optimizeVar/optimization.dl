@@ -113,6 +113,12 @@ MustPointToSerializerValue(?var, ?serializerValue, ?insn) :-
     ActualParam(_, ?insn, ?param),
     !mainAnalysis.VarPointsTo(_, ?serializerValue, _, ?param).
 
+// Innvocation without parameter
+MustPointToSerializerValue(?var, ?serializerValue, ?insn) :-
+    MustPointToSerializerValue(?var, ?serializerValue, ?prev),
+    NextInSameBasicBlock(?prev, ?insn),
+    !ActualParam(_, ?insn, _).
+
 MustPointToSerializerValue(?to, ?serializerValue, ?insn) :-
     MustPointToSerializerValue(?from, ?serializerValue, ?prev),
     NextInSameBasicBlock(?prev, ?insn),

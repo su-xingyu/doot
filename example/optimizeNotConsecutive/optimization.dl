@@ -1,9 +1,9 @@
 // --- Serializer definition ---
 .decl isSerializerMethod(?method:Method)
-isSerializerMethod("<OptimizeString: java.lang.String toHexString(java.lang.String)>").
+isSerializerMethod("<OptimizeNotConsecutive: java.lang.String toHexString(java.lang.String)>").
 
 .decl SerializerInputParam(?method:Method, ?index:number)
-SerializerInputParam("<OptimizeString: java.lang.String toHexString(java.lang.String)>", 0).
+SerializerInputParam("<OptimizeNotConsecutive: java.lang.String toHexString(java.lang.String)>", 0).
 
 // serializerValue is treated as a special heap value to fit in the framework
 .decl Serializer(?serializerValue:Value, ?input:Value, ?output:Var, ?method:Method)
@@ -12,16 +12,16 @@ SerializerInputParam("<OptimizeString: java.lang.String toHexString(java.lang.St
 
 // --- Deserializer definition ---
 .decl isDeserializerMethod(?method:Method)
-isDeserializerMethod("<OptimizeString: java.lang.String fromHexString(java.lang.String)>").
+isDeserializerMethod("<OptimizeNotConsecutive: java.lang.String fromHexString(java.lang.String)>").
 
 .decl DeserializerInputParam(?method:Method, ?index:number)
-DeserializerInputParam("<OptimizeString: java.lang.String fromHexString(java.lang.String)>", 0).
+DeserializerInputParam("<OptimizeNotConsecutive: java.lang.String fromHexString(java.lang.String)>", 0).
 
 .decl Deserializer(?input:Var, ?output:Var, ?method:Method, ?insn:Instruction)
 
 // --- Optimization definition ---
 .decl isInverse(?serializerMethod:Method, ?deserializerMethod:Method)
-isInverse("<OptimizeString: java.lang.String toHexString(java.lang.String)>", "<OptimizeString: java.lang.String fromHexString(java.lang.String)>").
+isInverse("<OptimizeNotConsecutive: java.lang.String toHexString(java.lang.String)>", "<OptimizeNotConsecutive: java.lang.String fromHexString(java.lang.String)>").
 
 // Only within the context of serialization
 .decl ValuePairToOptimize(?serializerInput:Value, ?deserializerOutput:Var)
