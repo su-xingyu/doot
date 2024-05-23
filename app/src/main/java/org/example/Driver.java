@@ -12,8 +12,7 @@ import soot.options.Options;
 import soot.shimple.Shimple;
 import soot.shimple.ShimpleBody;
 
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -35,6 +34,7 @@ public class Driver {
     private final Path tmpDir;
     private final Path inputDir;
     private final Path inlineResultDir;
+    private final Path datalogDir;
 
     private final boolean inlineEnabled;
     private final boolean optimizeEnabled;
@@ -58,6 +58,7 @@ public class Driver {
         this.tmpDir = Paths.get(baseDir + File.separator + "tmp");
         this.inputDir = Paths.get(tmpDir + File.separator + "input");
         this.inlineResultDir = Paths.get(tmpDir + File.separator + "inlineResult");
+        this.datalogDir = Paths.get(baseDir + File.separator + "datalog");
 
         this.inlineEnabled = inlineEnabled;
         this.optimizeEnabled = optimizeEnabled;
@@ -71,12 +72,46 @@ public class Driver {
 
         logger.debug("Copying input files to " + inputDir);
         FileUtils.copyDirectory(exampleDir.toFile(), inputDir.toFile());
+        Path inputFile = Paths.get(inputDir + File.separator + "input.dl");
+        if (inlineEnabled) {
+            Path inlineTemplate = Paths.get(datalogDir + File.separator + "inlineTemplate.dl");
+            Path inlineFile = Paths.get(inputDir + File.separator + "inline.dl");
+            merge2Files(inlineTemplate, inputFile, inlineFile);
+        }
+        if (optimizeEnabled) {
+            Path optimizeTemplate = Paths.get(datalogDir + File.separator + "optimizeTemplate.dl");
+            Path optimizeFile = Paths.get(inputDir + File.separator + "optimize.dl");
+            merge2Files(optimizeTemplate, inputFile, optimizeFile);
+        }
 
         String command1 = "javac *.java";
         executeCommand(command1, inputDir, null);
 
         String command2 = "jar -cfe " + mainClass + ".jar " + mainClass + " *.class";
         executeCommand(command2, inputDir, null);
+    }
+
+    private void merge2Files(Path file1, Path file2, Path fileMerged) throws IOException {
+        logger.debug("Merging files " + file1 + " " + file2 + " to " + fileMerged);
+
+        FileReader fReader1 = new FileReader(file1.toFile());
+        FileReader fReader2 = new FileReader(file2.toFile());
+        BufferedReader reader1 = new BufferedReader(fReader1);
+        BufferedReader reader2 = new BufferedReader(fReader2);
+
+        FileWriter fWriter = new FileWriter(fileMerged.toFile(), false);
+
+        String line;
+        while ((line = reader1.readLine()) != null) {
+            fWriter.write(line + System.lineSeparator());
+        }
+        while ((line = reader2.readLine()) != null) {
+            fWriter.write(line + System.lineSeparator());
+        }
+
+        reader1.close();
+        reader2.close();
+        fWriter.close();
     }
 
     public void removeTmpDir() throws IOException {
@@ -274,7 +309,7 @@ public class Driver {
         String command = "./doop "
                 + "-a context-insensitive "
                 + "-i " + optimizeInputDir + File.separator + mainClass + ".jar "
-                + "--extra-logic " + inputDir + File.separator + "optimization.dl "
+                + "--extra-logic " + inputDir + File.separator + "optimize.dl "
                 + "--app-only "
                 + "--cfg "
                 + "--stats none";

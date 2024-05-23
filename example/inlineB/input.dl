@@ -1,0 +1,6 @@
+// --- Input facts ---
+isSerializerMethod("<InlineB: java.lang.String toHexString(java.lang.String)>").
+SerializerInputParam("<InlineB: java.lang.String toHexString(java.lang.String)>", 0).
+isDeserializerMethod("<InlineB: java.lang.String fromHexString(java.lang.String)>").
+DeserializerInputParam("<InlineB: java.lang.String fromHexString(java.lang.String)>", 0).
+isInverse("<InlineB: java.lang.String toHexString(java.lang.String)>", "<InlineB: java.lang.String fromHexString(java.lang.String)>").

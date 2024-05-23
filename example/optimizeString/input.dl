@@ -1,0 +1,6 @@
+// --- Input facts ---
+isSerializerMethod("<OptimizeString: java.lang.String toHexString(java.lang.String)>").
+SerializerInputParam("<OptimizeString: java.lang.String toHexString(java.lang.String)>", 0).
+isDeserializerMethod("<OptimizeString: java.lang.String fromHexString(java.lang.String)>").
+DeserializerInputParam("<OptimizeString: java.lang.String fromHexString(java.lang.String)>", 0).
+isInverse("<OptimizeString: java.lang.String toHexString(java.lang.String)>", "<OptimizeString: java.lang.String fromHexString(java.lang.String)>").

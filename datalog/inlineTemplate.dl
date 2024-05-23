@@ -1,28 +1,24 @@
 // --- Serializer definition ---
-.decl isSerializerMethod(?method:Method)
-isSerializerMethod("<InlineB: java.lang.String toHexString(java.lang.String)>").
+.decl isSerializerMethod(?method: Method)
 
-.decl SerializerInputParam(?method:Method, ?index:number)
-SerializerInputParam("<InlineB: java.lang.String toHexString(java.lang.String)>", 0).
+.decl SerializerInputParam(?method: Method, ?index: number)
 
 // serializerValue is treated as a special heap value to fit in the framework
-.decl Serializer(?serializerValue:Value, ?input:Value, ?output:Var, ?method:Method)
+.decl Serializer(?serializerValue: Value, ?input: Value, ?output: Var, ?method: Method)
 
-.decl isSerializerValue(?serializerValue:Value)
+.decl isSerializerValue(?serializerValue: Value)
 
 // --- Deserializer definition ---
-.decl isDeserializerMethod(?method:Method)
-isDeserializerMethod("<InlineB: java.lang.String fromHexString(java.lang.String)>").
+.decl isDeserializerMethod(?method: Method)
 
-.decl DeserializerInputParam(?method:Method, ?index:number)
-DeserializerInputParam("<InlineB: java.lang.String fromHexString(java.lang.String)>", 0).
+.decl DeserializerInputParam(?method: Method, ?index: number)
 
-.decl Deserializer(?input:Var, ?output:Var, ?method:Method)
+.decl Deserializer(?input: Var, ?output: Var, ?method: Method)
+
+// --- Inverse definition ---
+.decl isInverse(?serializerMethod: Method, ?deserializerMethod: Method)
 
 // --- Inliner definition ---
-.decl isInverse(?serializerMethod:Method, ?deserializerMethod:Method)
-isInverse("<InlineB: java.lang.String toHexString(java.lang.String)>", "<InlineB: java.lang.String fromHexString(java.lang.String)>").
-
 .decl CandidateContextPair(?serializerCtx:mainAnalysis.configuration.HContext, ?varCtx:mainAnalysis.configuration.Context)
 
 .decl CandidateInvocationPair(?serializerInvocation:MethodInvocation, ?varInvocation:MethodInvocation)
@@ -105,3 +101,4 @@ MethodPairToInline(?meetPoint, ?serializerCallee) :-
 MethodPairToInline(?meetPoint, ?varCallee) :-
     CandidateMethods(_, ?meetPoint, ?meetPoint, ?varCallee),
     !isDeserializerMethod(?varCallee).
+
