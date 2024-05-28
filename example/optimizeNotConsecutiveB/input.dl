@@ -1,0 +1,6 @@
+// --- Input facts ---
+isSerializerMethod("<OptimizeNotConsecutiveB: java.lang.String toHexString(java.lang.String)>").
+SerializerInputParam("<OptimizeNotConsecutiveB: java.lang.String toHexString(java.lang.String)>", 0).
+isDeserializerMethod("<OptimizeNotConsecutiveB: java.lang.String fromHexString(java.lang.String)>").
+DeserializerInputParam("<OptimizeNotConsecutiveB: java.lang.String fromHexString(java.lang.String)>", 0).
+isInverse("<OptimizeNotConsecutiveB: java.lang.String toHexString(java.lang.String)>", "<OptimizeNotConsecutiveB: java.lang.String fromHexString(java.lang.String)>").

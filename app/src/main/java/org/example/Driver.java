@@ -310,7 +310,6 @@ public class Driver {
                 + "-a context-insensitive "
                 + "-i " + optimizeInputDir + File.separator + mainClass + ".jar "
                 + "--extra-logic " + inputDir + File.separator + "optimize.dl "
-                + "--app-only "
                 + "--cfg "
                 + "--stats none";
         logger.debug("Invoking doop");
@@ -334,6 +333,7 @@ public class Driver {
         }
 
         // Only 1-call-site-sensitivity+heap analysis is implemented
+        // For inlining, we care only about application code
         String command = "./doop "
                 + "-a 1-call-site-sensitive+heap "
                 + "-i " + inputDir + File.separator + mainClass + ".jar "

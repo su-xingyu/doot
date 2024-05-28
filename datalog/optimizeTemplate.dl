@@ -98,21 +98,64 @@ MustPointToSerializerValue(?var, ?serializerValue, ?insn) :-
     !StoreInstruction(?insn).
 
 // We over-approximate the point-to information towards ?serializerValue here to help with identifying whether function
-// arguments will possibly modify a ?serializerValue
-mainAnalysis.InstanceFieldPointsTo(?hctx, ?basevalue, ?signature, ?basehctx, ?basevalue) :-
-    mainAnalysis.InstanceFieldPointsTo(?hctx, _, ?signature, ?basehctx, ?basevalue),
+// arguments will possibly modify a ?serializerValue. If a variable contains a field pointing to a ?serializerValue or
+// it is a field of a ?serializerValue, we assume it points to a ?serializerValue
+mainAnalysis.InstanceFieldPointsTo(?hctx, ?basevalue, ?field, ?basehctx, ?basevalue) :-
+    mainAnalysis.InstanceFieldPointsTo(?hctx, _, ?field, ?basehctx, ?basevalue),
     isSerializerValue(?basevalue).
 
+mainAnalysis.VarPointsTo(?hctx, ?serializerValue, ?ctx, ?var) :-
+    mainAnalysis.InstanceFieldPointsTo(?hctx, ?serializerValue, _, _, ?basevalue),
+    mainAnalysis.VarPointsTo(?hctx, ?basevalue, ?ctx, ?var),
+    isSerializerValue(?serializerValue).
+
+// Static invocation
 MustPointToSerializerValue(?var, ?serializerValue, ?insn) :-
     MustPointToSerializerValue(?var, ?serializerValue, ?prev),
     NextInSameBasicBlock(?prev, ?insn),
+    isStaticMethodInvocation_Insn(?insn),
     ActualParam(_, ?insn, ?param),
     !mainAnalysis.VarPointsTo(_, ?serializerValue, _, ?param).
 
-// Innvocation without parameter
+// Static invocation without parameter
 MustPointToSerializerValue(?var, ?serializerValue, ?insn) :-
     MustPointToSerializerValue(?var, ?serializerValue, ?prev),
     NextInSameBasicBlock(?prev, ?insn),
+    isStaticMethodInvocation_Insn(?insn),
+    !ActualParam(_, ?insn, _).
+
+// Virtural invocation
+MustPointToSerializerValue(?var, ?serializerValue, ?insn) :-
+    MustPointToSerializerValue(?var, ?serializerValue, ?prev),
+    NextInSameBasicBlock(?prev, ?insn),
+    VirtualMethodInvocation_Base(?insn, ?base),
+    !mainAnalysis.VarPointsTo(_, ?serializerValue, _, ?base),
+    ActualParam(_, ?insn, ?param),
+    !mainAnalysis.VarPointsTo(_, ?serializerValue, _, ?param).
+
+// Virtural invocation without parameter
+MustPointToSerializerValue(?var, ?serializerValue, ?insn) :-
+    MustPointToSerializerValue(?var, ?serializerValue, ?prev),
+    NextInSameBasicBlock(?prev, ?insn),
+    VirtualMethodInvocation_Base(?insn, ?base),
+    !mainAnalysis.VarPointsTo(_, ?serializerValue, _, ?base),
+    !ActualParam(_, ?insn, _).
+
+// Special invocation
+MustPointToSerializerValue(?var, ?serializerValue, ?insn) :-
+    MustPointToSerializerValue(?var, ?serializerValue, ?prev),
+    NextInSameBasicBlock(?prev, ?insn),
+    SpecialMethodInvocation_Base(?insn, ?base),
+    !mainAnalysis.VarPointsTo(_, ?serializerValue, _, ?base),
+    ActualParam(_, ?insn, ?param),
+    !mainAnalysis.VarPointsTo(_, ?serializerValue, _, ?param).
+
+// Special invocation without parameter
+MustPointToSerializerValue(?var, ?serializerValue, ?insn) :-
+    MustPointToSerializerValue(?var, ?serializerValue, ?prev),
+    NextInSameBasicBlock(?prev, ?insn),
+    SpecialMethodInvocation_Base(?insn, ?base),
+    !mainAnalysis.VarPointsTo(_, ?serializerValue, _, ?base),
     !ActualParam(_, ?insn, _).
 
 MustPointToSerializerValue(?to, ?serializerValue, ?insn) :-
